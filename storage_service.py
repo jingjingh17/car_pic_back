@@ -37,8 +37,8 @@ class StorageService:
         if file_size > max_size:
             raise HTTPException(status_code=400, detail="文件大小不能超过5MB")
         
-        # 压缩图片并转换为BASE64
-        compressed_content = await self.compress_image(content, content_type)
+        # 压缩图片并转换为BASE64（质量70%，比缩略图稍好）
+        compressed_content = await self.compress_image(content, content_type, quality=70)
         base64_data = base64.b64encode(compressed_content).decode('utf-8')
         
         # 构建完整的data URL格式（压缩后统一使用JPEG格式）
