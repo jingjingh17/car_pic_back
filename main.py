@@ -163,9 +163,9 @@ async def get_regions():
     return {"regions": regions}
 
 @app.get("/api/cars")
-async def get_cars(region: str = None, db: Session = Depends(get_db)):
-    """获取车辆列表"""
-    return crud.get_cars(db, region=region)
+async def get_cars(region: str = None, page: int = 1, limit: int = 20, db: Session = Depends(get_db)):
+    """获取车辆列表（支持分页）"""
+    return crud.get_cars(db, region=region, page=page, limit=limit)
 
 @app.post("/api/cars")
 async def create_car(

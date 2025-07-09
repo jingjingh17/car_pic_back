@@ -14,25 +14,34 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def get_cars(db: Session, region: str = None):
-    """获取车辆列表"""
+def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
+    """获取车辆列表（支持分页）"""
     query = db.query(models.Car)
     if region:
         query = query.filter(models.Car.region == region)
     
-    cars = query.all()
+    # 计算总数
+    total = query.count()
+    
+    # 分页查询
+    cars = query.order_by(models.Car.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    
     return {
         "cars": [
             {
                 "id": car.id,
                 "region": car.region,
+                "image_base64": car.image_base64,
                 "contact": car.contact,
                 "description": car.description,
                 "created_at": car.created_at
-                # 移除 image_base64 字段
             }
             for car in cars
-        ]
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "has_more": (page * limit) < total
     }
 
 def get_car_by_id(db: Session, car_id: int):
