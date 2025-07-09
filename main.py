@@ -12,6 +12,12 @@ import schemas
 import crud
 from config import settings
 from storage_service import storage_service
+import traceback
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 创建数据库表
 models.Base.metadata.create_all(bind=engine)
@@ -21,9 +27,14 @@ app = FastAPI(title="车辆图片管理系统", version="1.0.0")
 # CORS配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://carpicfront-production.up.railway.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "*"  # 保留通配符作为备选
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -165,7 +176,15 @@ async def create_car(
     db: Session = Depends(get_db)
 ):
     """创建新车辆记录"""
-    return await crud.create_car(db, region, contact, description, image)
+    try:
+        logger.info(f"创建车辆请求: region={region}, contact={contact}, description={description}")
+        result = await crud.create_car(db, region, contact, description, image)
+        logger.info(f"车辆创建成功: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"创建车辆失败: {str(e)}")
+        logger.error(f"错误详情: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"创建车辆失败: {str(e)}")
 
 @app.get("/api/cars/{car_id}/details")
 async def get_car_details(car_id: int, db: Session = Depends(get_db)):
