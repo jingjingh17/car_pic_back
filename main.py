@@ -222,6 +222,47 @@ async def get_car_image(car_id: int, db: Session = Depends(get_db)):
         "message": "图片数据获取成功"
     }
 
+@app.get("/api/cars/{car_id}/thumbnail")
+async def get_car_thumbnail(car_id: int, db: Session = Depends(get_db)):
+    """获取车辆缩略图的BASE64数据"""
+    car = crud.get_car_by_id(db, car_id)
+    if not car:
+        raise HTTPException(status_code=404, detail="车辆不存在")
+    
+    # 如果没有缩略图，尝试生成一个
+    if not car.thumbnail_base64 and car.image_base64:
+        try:
+            # 从原始图片生成缩略图
+            import base64
+            from storage_service import storage_service
+            
+            # 提取原始图片数据
+            if ';base64,' in car.image_base64:
+                image_data = base64.b64decode(car.image_base64.split(';base64,')[1])
+                mime_type = car.image_base64.split(';')[0].replace('data:', '')
+                
+                # 生成缩略图
+                thumbnail_data = await storage_service.create_thumbnail(image_data, mime_type)
+                
+                if thumbnail_data:
+                    # 更新数据库
+                    car.thumbnail_base64 = thumbnail_data
+                    db.commit()
+                    
+                    return {
+                        "car_id": car_id,
+                        "thumbnail_base64": thumbnail_data,
+                        "message": "缩略图生成成功"
+                    }
+        except Exception as e:
+            print(f"生成缩略图失败: {e}")
+    
+    return {
+        "car_id": car_id,
+        "thumbnail_base64": car.thumbnail_base64,
+        "message": "缩略图数据获取成功"
+    }
+
 @app.post("/api/validate-image")
 async def validate_image(image: UploadFile = File(...)):
     """验证上传的图片是否有效"""

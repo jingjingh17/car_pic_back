@@ -2,6 +2,8 @@ import base64
 import mimetypes
 from typing import Optional
 from fastapi import UploadFile, HTTPException
+from PIL import Image
+import io
 
 class StorageService:
     def __init__(self):
@@ -13,6 +15,7 @@ class StorageService:
         上传文件并转换为BASE64
         返回格式: {
             "base64_data": "BASE64编码的图片数据",
+            "thumbnail_data": "缩略图BASE64数据",
             "mime_type": "图片MIME类型",
             "size": "文件大小"
         }
@@ -40,11 +43,66 @@ class StorageService:
         # 构建完整的data URL格式
         data_url = f"data:{content_type};base64,{base64_data}"
         
+        # 生成缩略图
+        thumbnail_data = await self.create_thumbnail(content, content_type)
+        
         return {
             "base64_data": data_url,
+            "thumbnail_data": thumbnail_data,
             "mime_type": content_type,
             "size": file_size
         }
+    
+    async def create_thumbnail(self, image_content: bytes, mime_type: str, max_width: int = 300, max_height: int = 200, quality: int = 85) -> str:
+        """
+        创建缩略图
+        """
+        try:
+            # 使用PIL打开图片
+            image = Image.open(io.BytesIO(image_content))
+            
+            # 转换为RGB模式（如果是RGBA，去除透明通道）
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # 创建白色背景
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            # 计算缩放比例
+            width, height = image.size
+            width_ratio = max_width / width
+            height_ratio = max_height / height
+            ratio = min(width_ratio, height_ratio)
+            
+            # 如果图片已经很小，不需要缩放
+            if ratio >= 1:
+                new_width, new_height = width, height
+            else:
+                new_width = int(width * ratio)
+                new_height = int(height * ratio)
+            
+            # 调整图片大小
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # 保存为JPEG格式的缩略图
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=quality, optimize=True)
+            thumbnail_content = output.getvalue()
+            
+            # 转换为BASE64
+            thumbnail_base64 = base64.b64encode(thumbnail_content).decode('utf-8')
+            thumbnail_data_url = f"data:image/jpeg;base64,{thumbnail_base64}"
+            
+            return thumbnail_data_url
+            
+        except Exception as e:
+            # 如果缩略图生成失败，返回None
+            print(f"生成缩略图失败: {e}")
+            return None
     
     async def delete_file(self, file_key: str) -> bool:
         """

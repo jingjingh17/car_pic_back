@@ -15,7 +15,7 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
-    """获取车辆列表（支持分页）"""
+    """获取车辆列表（支持分页）- 不包含图片数据"""
     query = db.query(models.Car)
     if region:
         query = query.filter(models.Car.region == region)
@@ -23,15 +23,20 @@ def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
     # 计算总数
     total = query.count()
     
-    # 分页查询
-    cars = query.order_by(models.Car.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    # 分页查询 - 只选择需要的字段，不包含image_base64
+    cars = query.with_entities(
+        models.Car.id,
+        models.Car.region,
+        models.Car.contact,
+        models.Car.description,
+        models.Car.created_at
+    ).order_by(models.Car.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
     
     return {
         "cars": [
             {
                 "id": car.id,
                 "region": car.region,
-                "image_base64": car.image_base64,
                 "contact": car.contact,
                 "description": car.description,
                 "created_at": car.created_at
@@ -57,6 +62,7 @@ async def create_car(db: Session, region: str, contact: str, description: str, i
     db_car = models.Car(
         region=region,
         image_base64=upload_result["base64_data"],
+        thumbnail_base64=upload_result["thumbnail_data"],  # 保存缩略图
         contact=contact,
         description=description
     )
@@ -69,6 +75,7 @@ async def create_car(db: Session, region: str, contact: str, description: str, i
         "id": db_car.id,
         "region": db_car.region,
         "image_base64": db_car.image_base64,
+        "thumbnail_base64": db_car.thumbnail_base64,
         "contact": db_car.contact,
         "description": db_car.description,
         "created_at": db_car.created_at
