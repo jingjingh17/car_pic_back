@@ -132,6 +132,7 @@ async def update_car(db: Session, car_id: int, region: str = None,
         # 上传新图片并转换为BASE64
         upload_result = await storage_service.upload_file(image)
         car.image_base64 = upload_result["base64_data"]
+        car.thumbnail_base64 = upload_result["thumbnail_data"]  # 同时更新缩略图
     
     db.commit()
     db.refresh(car)

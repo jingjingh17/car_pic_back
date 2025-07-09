@@ -12,7 +12,7 @@ class StorageService:
     
     async def upload_file(self, upload_file: UploadFile) -> dict:
         """
-        上传文件并转换为BASE64
+        上传文件并转换为BASE64（带压缩优化）
         返回格式: {
             "base64_data": "BASE64编码的图片数据",
             "thumbnail_data": "缩略图BASE64数据",
@@ -37,20 +37,21 @@ class StorageService:
         if file_size > max_size:
             raise HTTPException(status_code=400, detail="文件大小不能超过5MB")
         
-        # 转换为BASE64
-        base64_data = base64.b64encode(content).decode('utf-8')
+        # 压缩图片并转换为BASE64
+        compressed_content = await self.compress_image(content, content_type)
+        base64_data = base64.b64encode(compressed_content).decode('utf-8')
         
-        # 构建完整的data URL格式
-        data_url = f"data:{content_type};base64,{base64_data}"
+        # 构建完整的data URL格式（压缩后统一使用JPEG格式）
+        data_url = f"data:image/jpeg;base64,{base64_data}"
         
         # 生成缩略图
-        thumbnail_data = await self.create_thumbnail(content, content_type)
+        thumbnail_data = await self.create_thumbnail(compressed_content, "image/jpeg")
         
         return {
             "base64_data": data_url,
             "thumbnail_data": thumbnail_data,
-            "mime_type": content_type,
-            "size": file_size
+            "mime_type": "image/jpeg",
+            "size": len(compressed_content)
         }
     
     async def create_thumbnail(self, image_content: bytes, mime_type: str, max_width: int = 300, max_height: int = 200, quality: int = 85) -> str:
@@ -103,6 +104,49 @@ class StorageService:
             # 如果缩略图生成失败，返回None
             print(f"生成缩略图失败: {e}")
             return None
+    
+    async def compress_image(self, image_content: bytes, mime_type: str, quality: int = 50, max_width: int = 1920, max_height: int = 1080) -> bytes:
+        """
+        压缩图片，降低质量以减小文件大小
+        """
+        try:
+            # 使用PIL打开图片
+            image = Image.open(io.BytesIO(image_content))
+            
+            # 转换为RGB模式（如果是RGBA，去除透明通道）
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # 创建白色背景
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            # 计算缩放比例（如果图片太大）
+            width, height = image.size
+            width_ratio = max_width / width
+            height_ratio = max_height / height
+            ratio = min(width_ratio, height_ratio)
+            
+            # 如果图片尺寸超过限制，进行缩放
+            if ratio < 1:
+                new_width = int(width * ratio)
+                new_height = int(height * ratio)
+                image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # 保存为JPEG格式，使用指定的质量参数
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=quality, optimize=True)
+            compressed_content = output.getvalue()
+            
+            return compressed_content
+            
+        except Exception as e:
+            # 如果压缩失败，返回原始内容
+            print(f"图片压缩失败: {e}")
+            return image_content
     
     async def delete_file(self, file_key: str) -> bool:
         """
