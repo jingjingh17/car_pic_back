@@ -78,15 +78,29 @@ def main():
     print("📖 API文档: http://localhost:8000/docs")
     print("=" * 50)
     
-    # 启动服务器 - 使用正确的方式
+    # 启动服务器 - 根据环境判断是否使用reload
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        reload_dirs=["./"]
-    )
+    
+    # 检查是否在生产环境（Railway会设置这个环境变量）
+    is_production = os.getenv("RAILWAY_ENVIRONMENT") is not None or os.getenv("PORT") is not None
+    port = int(os.getenv("PORT", 8000))
+    
+    if is_production:
+        # 生产环境配置
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=port
+        )
+    else:
+        # 开发环境配置
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=port,
+            reload=True,
+            reload_dirs=["./"]
+        )
 
 if __name__ == "__main__":
     main() 
