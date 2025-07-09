@@ -15,7 +15,7 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
-    """获取车辆列表（支持分页）- 不包含图片数据"""
+    """获取车辆列表（支持分页）- 包含缩略图数据"""
     query = db.query(models.Car)
     if region:
         query = query.filter(models.Car.region == region)
@@ -23,13 +23,14 @@ def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
     # 计算总数
     total = query.count()
     
-    # 分页查询 - 只选择需要的字段，不包含image_base64
+    # 分页查询 - 包含缩略图字段
     cars = query.with_entities(
         models.Car.id,
         models.Car.region,
         models.Car.contact,
         models.Car.description,
-        models.Car.created_at
+        models.Car.created_at,
+        models.Car.thumbnail_base64
     ).order_by(models.Car.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
     
     return {
@@ -39,7 +40,8 @@ def get_cars(db: Session, region: str = None, page: int = 1, limit: int = 20):
                 "region": car.region,
                 "contact": car.contact,
                 "description": car.description,
-                "created_at": car.created_at
+                "created_at": car.created_at,
+                "thumbnail_base64": car.thumbnail_base64
             }
             for car in cars
         ],
