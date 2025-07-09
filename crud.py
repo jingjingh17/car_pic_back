@@ -26,10 +26,10 @@ def get_cars(db: Session, region: str = None):
             {
                 "id": car.id,
                 "region": car.region,
-                "image_base64": car.image_base64,
                 "contact": car.contact,
                 "description": car.description,
                 "created_at": car.created_at
+                # 移除 image_base64 字段
             }
             for car in cars
         ]
