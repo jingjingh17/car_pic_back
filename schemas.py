@@ -53,4 +53,32 @@ class User(UserBase):
     updated_at: Optional[datetime] = None
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+# 站点配置相关schemas
+class SiteConfigBase(BaseModel):
+    config_key: str
+    config_value: str
+    description: Optional[str] = None
+
+class SiteConfigCreate(SiteConfigBase):
+    pass
+
+class SiteConfigUpdate(BaseModel):
+    config_value: str
+    description: Optional[str] = None
+
+class SiteConfig(SiteConfigBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+# 首页密码验证
+class HomepagePasswordVerify(BaseModel):
+    password: str
+
+class HomepagePasswordSet(BaseModel):
+    password: str 

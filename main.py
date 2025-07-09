@@ -70,10 +70,53 @@ async def root():
 
 @app.get("/api/config")
 async def get_config():
-    """获取系统配置信息"""
     return {
-        "storage_type": "base64",
-        "max_file_size": "5MB"
+        "regions": ["福田", "罗湖", "南山", "龙华", "龙岗", "宝安", "沙井", "广州"],
+        "storage_type": "base64"
+    }
+
+# 首页密码验证相关API
+@app.post("/api/homepage/verify")
+async def verify_homepage_password(password_data: schemas.HomepagePasswordVerify, db: Session = Depends(get_db)):
+    """验证首页访问密码"""
+    is_valid = crud.verify_homepage_password(db, password_data.password)
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="密码错误")
+    return {"message": "密码验证成功"}
+
+@app.post("/api/admin/homepage-password")
+async def set_homepage_password(password_data: schemas.HomepagePasswordSet, db: Session = Depends(get_db), current_user: str = Depends(verify_token)):
+    """设置首页访问密码（管理员权限）"""
+    try:
+        # 检查是否已存在配置
+        existing_config = crud.get_site_config(db, "homepage_password")
+        if existing_config:
+            # 更新现有配置
+            config_update = schemas.SiteConfigUpdate(
+                config_value=password_data.password,
+                description="首页访问密码"
+            )
+            crud.update_site_config(db, "homepage_password", config_update)
+        else:
+            # 创建新配置
+            config_create = schemas.SiteConfigCreate(
+                config_key="homepage_password",
+                config_value=password_data.password,
+                description="首页访问密码"
+            )
+            crud.create_site_config(db, config_create)
+        
+        return {"message": "首页密码设置成功"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"设置失败: {str(e)}")
+
+@app.get("/api/admin/homepage-password/status")
+async def get_homepage_password_status(db: Session = Depends(get_db), current_user: str = Depends(verify_token)):
+    """获取首页密码设置状态（管理员权限）"""
+    config = crud.get_site_config(db, "homepage_password")
+    return {
+        "has_password": config is not None,
+        "description": config.description if config else None
     }
 
 @app.post("/api/admin/login")

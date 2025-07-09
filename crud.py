@@ -27,6 +27,7 @@ def get_cars(db: Session, region: str = None):
                 "id": car.id,
                 "region": car.region,
                 "image_base64": car.image_base64,
+                "contact": car.contact,
                 "description": car.description,
                 "created_at": car.created_at
             }
@@ -63,6 +64,7 @@ async def create_car(db: Session, region: str, password: str, contact: str, desc
         "id": db_car.id,
         "region": db_car.region,
         "image_base64": db_car.image_base64,
+        "contact": db_car.contact,
         "description": db_car.description,
         "created_at": db_car.created_at
     }
@@ -135,6 +137,7 @@ async def update_car(db: Session, car_id: int, region: str = None, password: str
         "id": car.id,
         "region": car.region,
         "image_base64": car.image_base64,
+        "contact": car.contact,
         "description": car.description,
         "created_at": car.created_at
     }
@@ -163,4 +166,73 @@ def authenticate_user(db: Session, username: str, password: str):
         return False
     if not verify_password(password, user.password):
         return False
-    return user 
+    return user
+
+# 站点配置相关CRUD操作
+def get_site_config(db: Session, config_key: str):
+    """获取站点配置"""
+    return db.query(models.SiteConfig).filter(models.SiteConfig.config_key == config_key).first()
+
+def create_site_config(db: Session, config: schemas.SiteConfigCreate):
+    """创建站点配置"""
+    # 检查是否已存在
+    existing = get_site_config(db, config.config_key)
+    if existing:
+        raise HTTPException(status_code=400, detail="配置项已存在")
+    
+    # 如果是密码配置，需要加密
+    config_value = config.config_value
+    if config.config_key == "homepage_password":
+        config_value = get_password_hash(config.config_value)
+    
+    db_config = models.SiteConfig(
+        config_key=config.config_key,
+        config_value=config_value,
+        description=config.description
+    )
+    db.add(db_config)
+    db.commit()
+    db.refresh(db_config)
+    return db_config
+
+def update_site_config(db: Session, config_key: str, config_update: schemas.SiteConfigUpdate):
+    """更新站点配置"""
+    db_config = get_site_config(db, config_key)
+    if not db_config:
+        raise HTTPException(status_code=404, detail="配置项不存在")
+    
+    # 如果是密码配置，需要加密
+    config_value = config_update.config_value
+    if config_key == "homepage_password":
+        config_value = get_password_hash(config_update.config_value)
+    
+    db_config.config_value = config_value
+    if config_update.description is not None:
+        db_config.description = config_update.description
+    
+    db.commit()
+    db.refresh(db_config)
+    return db_config
+
+def verify_homepage_password(db: Session, password: str):
+    """验证首页密码"""
+    config = get_site_config(db, "homepage_password")
+    if not config:
+        # 如果没有设置密码，默认允许访问
+        return True
+    
+    return verify_password(password, config.config_value)
+
+def init_default_homepage_password(db: Session):
+    """初始化默认首页密码"""
+    config = get_site_config(db, "homepage_password")
+    if not config:
+        # 创建默认密码：123456
+        default_config = schemas.SiteConfigCreate(
+            config_key="homepage_password",
+            config_value="123456",
+            description="首页访问密码"
+        )
+        create_site_config(db, default_config)
+        return "123456"
+    return None 
