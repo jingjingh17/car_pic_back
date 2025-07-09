@@ -1,0 +1,56 @@
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
+class CarBase(BaseModel):
+    region: str
+    contact: str
+    description: Optional[str] = None
+
+class CarCreate(CarBase):
+    password: str
+
+class CarUpdate(BaseModel):
+    region: Optional[str] = None
+    password: Optional[str] = None
+    contact: Optional[str] = None
+    description: Optional[str] = None
+
+class Car(CarBase):
+    id: int
+    image_base64: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class CarDetails(Car):
+    contact: str
+    description: Optional[str] = None
+
+class PasswordVerify(BaseModel):
+    password: str
+
+# 管理员相关schemas
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+class AdminToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class UserBase(BaseModel):
+    username: str
+
+class UserCreate(UserBase):
+    password: str
+
+class User(UserBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True 

@@ -1,0 +1,166 @@
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from fastapi import HTTPException, UploadFile
+from passlib.context import CryptContext
+import models
+import schemas
+from storage_service import storage_service
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def get_cars(db: Session, region: str = None):
+    """获取车辆列表"""
+    query = db.query(models.Car)
+    if region:
+        query = query.filter(models.Car.region == region)
+    
+    cars = query.all()
+    return {
+        "cars": [
+            {
+                "id": car.id,
+                "region": car.region,
+                "image_base64": car.image_base64,
+                "description": car.description,
+                "created_at": car.created_at
+            }
+            for car in cars
+        ]
+    }
+
+def get_car_by_id(db: Session, car_id: int):
+    """通过ID获取车辆"""
+    return db.query(models.Car).filter(models.Car.id == car_id).first()
+
+async def create_car(db: Session, region: str, password: str, contact: str, description: str, image: UploadFile):
+    """创建新车辆记录"""
+    # 上传图片并转换为BASE64
+    upload_result = await storage_service.upload_file(image)
+    
+    # 加密密码
+    hashed_password = get_password_hash(password)
+    
+    # 创建车辆记录
+    db_car = models.Car(
+        region=region,
+        image_base64=upload_result["base64_data"],
+        password=hashed_password,
+        contact=contact,
+        description=description
+    )
+    
+    db.add(db_car)
+    db.commit()
+    db.refresh(db_car)
+    
+    return {
+        "id": db_car.id,
+        "region": db_car.region,
+        "image_base64": db_car.image_base64,
+        "description": db_car.description,
+        "created_at": db_car.created_at
+    }
+
+def verify_car_password(db: Session, car_id: int, password: str):
+    """验证车辆密码"""
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not car:
+        raise HTTPException(status_code=404, detail="车辆不存在")
+    
+    if not verify_password(password, car.password):
+        raise HTTPException(status_code=401, detail="密码错误")
+    
+    return {"message": "密码验证成功", "car_id": car_id}
+
+def get_car_details(db: Session, car_id: int):
+    """获取车辆详情"""
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not car:
+        raise HTTPException(status_code=404, detail="车辆不存在")
+    
+    return {
+        "id": car.id,
+        "region": car.region,
+        "image_base64": car.image_base64,
+        "contact": car.contact,
+        "description": car.description,
+        "created_at": car.created_at
+    }
+
+async def delete_car(db: Session, car_id: int):
+    """删除车辆"""
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not car:
+        raise HTTPException(status_code=404, detail="车辆不存在")
+    
+    # BASE64存储不需要删除文件
+    db.delete(car)
+    db.commit()
+    
+    return {"message": "车辆删除成功"}
+
+async def update_car(db: Session, car_id: int, region: str = None, password: str = None, 
+                    contact: str = None, description: str = None, image: UploadFile = None):
+    """更新车辆信息"""
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not car:
+        raise HTTPException(status_code=404, detail="车辆不存在")
+    
+    # 更新字段
+    if region:
+        car.region = region
+    if password:
+        car.password = get_password_hash(password)
+    if contact:
+        car.contact = contact
+    if description is not None:
+        car.description = description
+    
+    # 更新图片
+    if image:
+        # 上传新图片并转换为BASE64
+        upload_result = await storage_service.upload_file(image)
+        car.image_base64 = upload_result["base64_data"]
+    
+    db.commit()
+    db.refresh(car)
+    
+    return {
+        "id": car.id,
+        "region": car.region,
+        "image_base64": car.image_base64,
+        "description": car.description,
+        "created_at": car.created_at
+    }
+
+# 用户相关CRUD操作
+def get_user_by_username(db: Session, username: str):
+    """通过用户名获取用户"""
+    return db.query(models.User).filter(models.User.username == username).first()
+
+def create_user(db: Session, user: schemas.UserCreate):
+    """创建新用户"""
+    hashed_password = get_password_hash(user.password)
+    db_user = models.User(
+        username=user.username,
+        password=hashed_password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def authenticate_user(db: Session, username: str, password: str):
+    """验证用户"""
+    user = get_user_by_username(db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.password):
+        return False
+    return user 

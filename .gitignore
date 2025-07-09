@@ -1,0 +1,7 @@
+*.md
+fix*.py
+init_admin.py
+setup_env.py
+test*.py
+
+migration*.py
