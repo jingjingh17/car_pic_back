@@ -188,4 +188,7 @@ async def validate_image(image: UploadFile = File(...)):
         }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=True) 
+    # 获取端口，Railway会提供PORT环境变量
+    import os
+    port = int(os.getenv("PORT", settings.PORT))
+    uvicorn.run(app, host="0.0.0.0", port=port) 
