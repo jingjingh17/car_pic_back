@@ -4,15 +4,14 @@ from typing import Optional
 
 class CarBase(BaseModel):
     region: str
-    contact: str
+    contact: Optional[str] = None
     description: Optional[str] = None
 
 class CarCreate(CarBase):
-    password: str
+    pass
 
 class CarUpdate(BaseModel):
     region: Optional[str] = None
-    password: Optional[str] = None
     contact: Optional[str] = None
     description: Optional[str] = None
 
@@ -26,11 +25,10 @@ class Car(CarBase):
         from_attributes = True
 
 class CarDetails(Car):
-    contact: str
+    contact: Optional[str] = None
     description: Optional[str] = None
 
-class PasswordVerify(BaseModel):
-    password: str
+
 
 # 管理员相关schemas
 class AdminLogin(BaseModel):

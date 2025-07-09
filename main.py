@@ -159,23 +159,17 @@ async def get_cars(region: str = None, db: Session = Depends(get_db)):
 @app.post("/api/cars")
 async def create_car(
     region: str = Form(...),
-    password: str = Form(...),
-    contact: str = Form(...),
+    contact: str = Form(None),
     description: str = Form(None),
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """创建新车辆记录"""
-    return await crud.create_car(db, region, password, contact, description, image)
-
-@app.post("/api/cars/{car_id}/verify")
-async def verify_password(car_id: int, password_data: schemas.PasswordVerify, db: Session = Depends(get_db)):
-    """验证密码"""
-    return crud.verify_car_password(db, car_id, password_data.password)
+    return await crud.create_car(db, region, contact, description, image)
 
 @app.get("/api/cars/{car_id}/details")
 async def get_car_details(car_id: int, db: Session = Depends(get_db)):
-    """获取车辆详情（需要先验证密码）"""
+    """获取车辆详情"""
     return crud.get_car_details(db, car_id)
 
 @app.delete("/api/cars/{car_id}")
@@ -187,7 +181,6 @@ async def delete_car(car_id: int, db: Session = Depends(get_db), current_user: s
 async def update_car(
     car_id: int,
     region: str = Form(None),
-    password: str = Form(None),
     contact: str = Form(None),
     description: str = Form(None),
     image: UploadFile = File(None),
@@ -195,7 +188,7 @@ async def update_car(
     current_user: str = Depends(verify_token)
 ):
     """更新车辆信息（需要管理员权限）"""
-    return await crud.update_car(db, car_id, region, password, contact, description, image)
+    return await crud.update_car(db, car_id, region, contact, description, image)
 
 @app.get("/api/cars/{car_id}/image")
 async def get_car_image(car_id: int, db: Session = Depends(get_db)):

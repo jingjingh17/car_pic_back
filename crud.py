@@ -39,19 +39,15 @@ def get_car_by_id(db: Session, car_id: int):
     """通过ID获取车辆"""
     return db.query(models.Car).filter(models.Car.id == car_id).first()
 
-async def create_car(db: Session, region: str, password: str, contact: str, description: str, image: UploadFile):
+async def create_car(db: Session, region: str, contact: str, description: str, image: UploadFile):
     """创建新车辆记录"""
     # 上传图片并转换为BASE64
     upload_result = await storage_service.upload_file(image)
-    
-    # 加密密码
-    hashed_password = get_password_hash(password)
     
     # 创建车辆记录
     db_car = models.Car(
         region=region,
         image_base64=upload_result["base64_data"],
-        password=hashed_password,
         contact=contact,
         description=description
     )
@@ -69,16 +65,7 @@ async def create_car(db: Session, region: str, password: str, contact: str, desc
         "created_at": db_car.created_at
     }
 
-def verify_car_password(db: Session, car_id: int, password: str):
-    """验证车辆密码"""
-    car = db.query(models.Car).filter(models.Car.id == car_id).first()
-    if not car:
-        raise HTTPException(status_code=404, detail="车辆不存在")
-    
-    if not verify_password(password, car.password):
-        raise HTTPException(status_code=401, detail="密码错误")
-    
-    return {"message": "密码验证成功", "car_id": car_id}
+
 
 def get_car_details(db: Session, car_id: int):
     """获取车辆详情"""
@@ -107,7 +94,7 @@ async def delete_car(db: Session, car_id: int):
     
     return {"message": "车辆删除成功"}
 
-async def update_car(db: Session, car_id: int, region: str = None, password: str = None, 
+async def update_car(db: Session, car_id: int, region: str = None, 
                     contact: str = None, description: str = None, image: UploadFile = None):
     """更新车辆信息"""
     car = db.query(models.Car).filter(models.Car.id == car_id).first()
@@ -117,9 +104,7 @@ async def update_car(db: Session, car_id: int, region: str = None, password: str
     # 更新字段
     if region:
         car.region = region
-    if password:
-        car.password = get_password_hash(password)
-    if contact:
+    if contact is not None:
         car.contact = contact
     if description is not None:
         car.description = description
